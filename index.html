@@ -631,6 +631,10 @@
               <span>مبلغ قابل پرداخت:</span>
               <span id="p-grandTotal">۰ تومان</span>
             </div>
+            <div class="tot-line" style="background:#f8fafc;color:#0f172a;font-size:0.82rem;">
+              <span>مبلغ به حروف:</span>
+              <span id="p-grandTotalWords" style="text-align:right;max-width:65%;"></span>
+            </div>
           </div>
         </div>
       </div>
@@ -861,6 +865,43 @@
     });
   }
 
+
+  function numberToPersianWords(num) {
+    num = Math.floor(Number(num) || 0);
+    if (num === 0) return 'صفر';
+    const ones = ['', 'یک', 'دو', 'سه', 'چهار', 'پنج', 'شش', 'هفت', 'هشت', 'نه'];
+    const teens = ['ده', 'یازده', 'دوازده', 'سیزده', 'چهارده', 'پانزده', 'شانزده', 'هفده', 'هجده', 'نوزده'];
+    const tens = ['', '', 'بیست', 'سی', 'چهل', 'پنجاه', 'شصت', 'هفتاد', 'هشتاد', 'نود'];
+    const hundreds = ['', 'صد', 'دویست', 'سیصد', 'چهارصد', 'پانصد', 'ششصد', 'هفتصد', 'هشتصد', 'نهصد'];
+    const scales = ['', 'هزار', 'میلیون', 'میلیارد', 'تریلیون'];
+    function threeDigits(n) {
+      const parts = [];
+      const h = Math.floor(n / 100), r = n % 100;
+      if (h) parts.push(hundreds[h]);
+      if (r >= 10 && r < 20) parts.push(teens[r - 10]);
+      else {
+        const t = Math.floor(r / 10), o = r % 10;
+        if (t) parts.push(tens[t]);
+        if (o) parts.push(ones[o]);
+      }
+      return parts.join(' و ');
+    }
+    const parts = [];
+    let scale = 0;
+    while (num > 0) {
+      const chunk = num % 1000;
+      if (chunk) {
+        let chunkText = threeDigits(chunk);
+        if (scales[scale]) chunkText += ' ' + scales[scale];
+        else if (scale > scales.length - 1) chunkText += ' ' + ['','','','',''][scale] || '';
+        parts.unshift(chunkText);
+      }
+      num = Math.floor(num / 1000);
+      scale++;
+    }
+    return parts.join(' و ');
+  }
+
   function calculateAll() {
     const boxes = document.querySelectorAll('#itemsContainer .item-box');
     let subTotal = 0;
@@ -943,6 +984,7 @@
     document.getElementById('p-subTotal').textContent = formatComma(subTotal) + ' تومان';
     document.getElementById('p-discount').textContent = formatComma(discount) + ' تومان';
     document.getElementById('p-grandTotal').textContent = formatComma(grandTotal) + ' تومان';
+    document.getElementById('p-grandTotalWords').textContent = numberToPersianWords(grandTotal) + ' تومان';
 
     document.getElementById('p-discountRow').style.display = discount > 0 ? 'flex' : 'none';
 
