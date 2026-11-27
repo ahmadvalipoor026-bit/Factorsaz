@@ -559,6 +559,7 @@
 
 <!-- نوار دکمه‌های پایین -->
 <div class="bottom-bar">
+  <button type="button" class="btn-main" style="background:#475569;max-width:150px;" onclick="showHistory()">📚 تاریخچه</button>
   <button type="button" class="btn-main btn-reset" onclick="resetForm()">پاک کردن</button>
   <button type="button" class="btn-main btn-preview" onclick="openPreview()">📄 مشاهده و ارسال فاکتور</button>
 </div>
@@ -639,6 +640,16 @@
         </div>
       </div>
     </div>
+  </div>
+</div>
+
+
+<div class="modal-overlay" id="historyModal">
+  <div class="modal-content">
+    <h3 style="margin-top:4px;">📚 تاریخچه فاکتورها</h3>
+    <input id="historySearch" type="text" placeholder="جستجو نام فروشنده یا تاریخ..." oninput="renderHistory()" style="width:100%;padding:12px;margin:8px 0;border:1px solid #ddd;border-radius:10px;box-sizing:border-box;" />
+    <div id="historyList"></div>
+    <button class="btn-main" style="background:#64748b;margin-top:12px;width:100%;" onclick="document.getElementById('historyModal').style.display='none'">بستن</button>
   </div>
 </div>
 
@@ -988,7 +999,33 @@
 
     document.getElementById('p-discountRow').style.display = discount > 0 ? 'flex' : 'none';
 
+    saveInvoiceToHistory({sellerKey:key, seller, date:dateVal, invNum, buyer, phone, discount, items:Array.from(boxes).map(box=>({desc:box.querySelector('.item-desc').value, qty:box.querySelector('.item-qty').value, price:box.querySelector('.item-price').value})), subTotal, grandTotal});
     document.getElementById('previewModal').style.display = 'block';
+  }
+
+
+  function getInvoiceHistory() { try { return JSON.parse(localStorage.getItem('invoice_history_v1') || '[]'); } catch(e) { return []; } }
+  function saveInvoiceToHistory(data) {
+    try {
+      const history = getInvoiceHistory();
+      const record = {...data, savedAt:Date.now()};
+      const existing = history.findIndex(x=>x.sellerKey===data.sellerKey && x.invNum===data.invNum);
+      if(existing>=0) history[existing]=record; else history.unshift(record);
+      localStorage.setItem('invoice_history_v1', JSON.stringify(history));
+    } catch(e) { alert('ذخیره تاریخچه انجام نشد؛ ممکن است حافظه مرورگر پر باشد.'); }
+  }
+  function showHistory() { document.getElementById('historySearch').value=''; renderHistory(); document.getElementById('historyModal').style.display='block'; }
+  function renderHistory() {
+    const list=document.getElementById('historyList'), query=(document.getElementById('historySearch').value||'').trim().toLowerCase();
+    const history=getInvoiceHistory().filter(x=>(x.seller||'').toLowerCase().includes(query)||(x.date||'').toLowerCase().includes(query));
+    if(!history.length){list.innerHTML='<p style="text-align:center;padding:20px;color:#64748b;">فاکتوری در تاریخچه پیدا نشد.</p>';return;}
+    list.innerHTML=history.map((x,i)=>`<div style="border:1px solid #e2e8f0;border-radius:12px;padding:12px;margin:8px 0;display:flex;flex-direction:column;gap:8px"><strong>${escapeHistoryText(x.seller)} — ${escapeHistoryText(x.date)}</strong><div>شماره: ${escapeHistoryText(x.invNum||'-')} | مشتری: ${escapeHistoryText(x.buyer||'-')}</div><div style="font-weight:bold;color:#0f766e">${formatComma(x.grandTotal||0)} تومان</div><div style="display:flex;gap:8px"><button onclick="loadHistoryInvoice(${i})" style="flex:1;padding:9px;border:0;border-radius:8px;background:#0f766e;color:white">بازکردن</button><button onclick="deleteHistoryInvoice('${encodeURIComponent(x.sellerKey+'|'+x.invNum)}')" style="padding:9px;border:0;border-radius:8px;background:#dc2626;color:white">حذف</button></div></div>`).join('');
+  }
+  function escapeHistoryText(value){return String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+  function deleteHistoryInvoice(encoded){const [sellerKey,invNum]=decodeURIComponent(encoded).split('|');if(!confirm('این فاکتور از تاریخچه حذف شود؟'))return;localStorage.setItem('invoice_history_v1',JSON.stringify(getInvoiceHistory().filter(x=>!(x.sellerKey===sellerKey&&x.invNum===invNum))));renderHistory();}
+  function loadHistoryInvoice(index){const query=(document.getElementById('historySearch').value||'').trim().toLowerCase();const filtered=getInvoiceHistory().filter(x=>(x.seller||'').toLowerCase().includes(query)||(x.date||'').toLowerCase().includes(query));const x=filtered[index];if(!x)return;
+    document.getElementById('sellerSelect').value=x.sellerKey;onSellerChange();document.getElementById('issueDate').value=x.date;document.getElementById('invoiceNumber').value=x.invNum;document.getElementById('buyerName').value=x.buyer||'';document.getElementById('buyerPhone').value=x.phone==='-'?'':(x.phone||'');document.getElementById('discountInput').value=formatComma(x.discount||0);
+    document.getElementById('itemsContainer').innerHTML='';(x.items||[]).forEach(it=>addItem(it.desc,it.qty,it.price));if(!(x.items||[]).length)addItem();calculateAll();document.getElementById('historyModal').style.display='none';openPreview();
   }
 
   function closePreview() {
